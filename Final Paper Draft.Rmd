@@ -17,30 +17,24 @@ library(purrr)
 library(ggplot2)
 library(tidytext)
 library(gridExtra)
-```
-
-```{r}
-#web scraped using selector gadget
-src <- read_html("https://www.lesswrong.com/posts/wPYFuRq4WnTqiEyJs/carefully-edited-transcript-of-trump-s-nov-15th-campaign")
-
-trump_script <- html_nodes( src, xpath = "//p")
-trump_script
-
-tester <- trump_script
+library(gtrendsR)
 ```
 
 ### OZ
+# extracting the last 1000 tweets from Oz's twitter account
 ```{r}
 oz_tweets <- get_timeline(user = "DrOz", n=1000)
 
 oz_tweets_df <- tbl_df(as.data.frame(oz_tweets))
 oz_tweets_df
 ```
-
+# getting mean of fetterman tweets for cuttoff point
 ```{r}
 mean(oz_tweets_df$display_text_range)
 ```
-
+# cleaning oz tweet data 
+# separating the time of tweets into year, month, day, hour, minute, second
+# splitting number of characters per tweet in half at its mean
 ```{r}
  oz_tweets_df_timed <- oz_tweets_df %>%
   separate(created_at, c("year", "month", "day"), sep = "-") %>%
@@ -54,7 +48,7 @@ mean(oz_tweets_df$display_text_range)
 oz_tweets_df_timed
 ```
 
-
+# plotting oz tweets over hour of the day by number of favorites, separated by number of characters, cuttoff point = 147 (mean)
 ```{r}
 oz_tweets_df_timed %>%
   select(hour, favorite_count, display_text_range_h) %>%
@@ -74,16 +68,20 @@ oz_tweets_df_timed %>%
 
 
 ### FETTERMAN
+# extracting the last 1000 fetterman tweets
 ```{r}
 fett_tweets <- get_timeline(user = "JohnFetterman", n=1000)
 
 fett_tweets_df <- tbl_df(as.data.frame(fett_tweets))
 fett_tweets_df
 ```
+# getting mean of fetterman tweets for cuttoff point
 ```{r}
 mean(fett_tweets_df$display_text_range)
 ```
-
+# cleaning fetterman tweet data 
+# separating the time of tweets into year, month, day, hour, minute, second
+# splitting number of characters per tweet in half at its mean
 ```{r}
  fett_tweets_df_timed <- fett_tweets_df %>%
   separate(created_at, c("year", "month", "day"), sep = "-") %>%
@@ -96,16 +94,16 @@ mean(fett_tweets_df$display_text_range)
 ```{r}
 fett_tweets_df_timed
 ```
-
+# plotting fetterman tweets over hour of the day by number of favorites, separated by number of characters, cuttoff point = 137 (mean)
 ```{r}
 fett_tweets_df_timed %>%
   select(hour, favorite_count, display_text_range_h) %>%
   ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
   geom_point()+
-  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 137 Characters")
 ```
 # this has a crazy outlier here of more than 600,000 favorites, so I will remove it to make the rest of the data easier to view. I will still consider the data point in my analysis
-
+# removing the outlier - will make a note in analysis
 ```{r}
 fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed %>%
   arrange(desc(favorite_count)) 
@@ -114,6 +112,7 @@ fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed_outlierfix [-1,]
 fett_tweets_df_timed_outlierfix
   
 ```
+# 
 ```{r}
 fett_tweets_df_timed_outlierfix %>%
   select(hour, favorite_count, display_text_range_h) %>%
@@ -125,7 +124,8 @@ fett_tweets_df_timed_outlierfix %>%
 
 ### FETTERMAN END
 
-### Both
+### Pictures/links in tweets
+# oz picture/links tweets
 ```{r}
 oz_tweets_picture <- oz_tweets_df %>% 
   filter(!str_detect(text, '^"')) %>%
@@ -135,6 +135,7 @@ oz_tweets_picture <- oz_tweets_df %>%
   mutate(pictureFett = picture)
 oz_tweets_picture
 ```
+# fetterman picture links/tweets
 ```{r}
 fett_tweets_picture <- fett_tweets_df %>% 
   filter(!str_detect(text, '^"')) %>%
@@ -144,6 +145,7 @@ fett_tweets_picture <- fett_tweets_df %>%
   mutate(pictureOz = picture)
 fett_tweets_picture
 ```
+# joining both to have 1 picture/links tibble
 ```{r}
 oz_fett_tweets_picture <- full_join(oz_tweets_picture, fett_tweets_picture) 
 oz_fett_tweets_picture
@@ -171,11 +173,12 @@ oz_tweet_words_r <-oz_tweet_words %>%
   arrange(desc(n))
 oz_tweet_words_r 
 ```
+# oz most used words barplot
 ```{r}
-oz_tweet_words_top15 <- oz_tweet_words_r %>%
+oz_tweet_words_top20 <- oz_tweet_words_r %>%
   top_n(20) %>%
   arrange(desc(n))
-
+oz_tweet_words_top20
 ggplot(oz_tweet_words_top15, aes(x=n, y=word))+
   geom_bar(stat = "identity")
 ```
@@ -195,6 +198,7 @@ fett_tweet_words_r <-fett_tweet_words %>%
   arrange(desc(n))
 fett_tweet_words_r 
 ```
+#fetterman most used words barplot
 ```{r}
 fett_tweet_words_top15 <- fett_tweet_words_r %>%
   top_n(20) %>%
@@ -205,6 +209,7 @@ ggplot(fett_tweet_words_top15, aes(x=n, y=word))+
 ```
 
 # both
+# oz sentiment of tweets
 ```{r}
 sentiments
 
@@ -214,7 +219,7 @@ oz_tweet_words_sentiment <- oz_tweet_words_r %>%
   count(sentiment) 
 oz_tweet_words_sentiment
 ```
-
+# fetterman sentiment of tweets
 ```{r}
 fett_tweet_words_sentiment <- fett_tweet_words_r %>%
   inner_join(sentiments, by = "word") %>%
@@ -222,16 +227,108 @@ fett_tweet_words_sentiment <- fett_tweet_words_r %>%
   count(sentiment) 
 fett_tweet_words_sentiment
 ```
-
+# sentiment plots for both twitter accounts - oz on left, fetterman on right
 ```{r}
 oz_sentiment_plot <- ggplot(oz_tweet_words_sentiment, aes(sentiment, n))+
   geom_bar(stat = "identity", position = "dodge")
 
-fett_sentiment_plot <- ggplot(fett_tweet_words_sentiment, aes(sentiment, n))+
+fett_sentiment_plot <- ggplot(fett_tweet_words_sentiment, aes(sentiment, n, ylim=c(0,250)))+
   geom_bar(stat = "identity", position = "dodge")
 
 grid.arrange(oz_sentiment_plot, fett_sentiment_plot, ncol=2)
 ```
+####
+
+
+# constituency analysis
+```{r}
+names <- gtrends(c("dr", "oz", "john", "fetterman"), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+plot(names)
+```
+
+# oz twitter account's most used words
+# 'Fetterman' (1), 'John' (2), 'Pennsylvania' (3), Rt(5), Pa(6), 'Pennsylvanians' (9), 'Oz' (17) - *'Word' (rank of most used on Oz's account)* - I have removed these words from my gtrends search as I have deemed them not useful to my analysis. 'Policies' (8) has been changed to 'policy' for my search. 
+```{r}
+google_oz_1t5 <- gtrends(c("crime", "biden", "policy", 'radical', 'washington'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+
+google_oz_6t10 <- gtrends(c("debate", 'senate', 'change', 'inflation', 'energy'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+google_oz_1t5_plot <- plot(google_oz_1t5)
+google_oz_6t10_plot <- plot(google_oz_6t10)
+```
+
+
+#GTRENDS FETTERMAN
+# gtrends search by fetterman's twitter account's most used words 
+```{r}
+google_fett_1t5 <- gtrends(c("vote", "people", "senate", 'campaign', 'abortion'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+
+google_fett_6t10 <- gtrends(c("fight", 'election', 'union', 'life', 'philly'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+google_fett_1t5_plot <- plot(google_fett_1t5)
+google_fett_6t10_plot <- plot(google_fett_6t10)
+```
+
+# PLOT GTRENDS BOTH
+# plots of google searches over time for both's twitter's favorite words
+```{r}
+grid.arrange(google_oz_1t5_plot, google_oz_6t10_plot, ncol=1) 
+grid.arrange(google_fett_1t5_plot, google_fett_6t10_plot, ncol=1)
+```
+# OZ GTRENDS facets
+# plots of google searches for oz's twitter's favorite words 1-5
+```{r}
+google_oz_1t5_df <- as.data.frame(google_oz_1t5)
+google_oz_1t5_df
+
+google_oz_1t5_df$interest_over_time.hits <- as.numeric(google_oz_1t5_df$interest_over_time.hits)
+
+google_oz_1t5_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+```
+# plots of google searches for oz's twitter's favorite words 6-10
+```{r}
+google_oz_6t10_df <- as.data.frame(google_oz_6t10)
+google_oz_6t10_df
+
+google_oz_6t10_df$interest_over_time.hits <- as.numeric(google_oz_6t10_df$interest_over_time.hits)
+
+google_oz_6t10_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+```
+
+# FETTERMAN GTRENDS facets
+# plots of google searches for fetterman's twitter's favorite words 1-5
+```{r}
+google_fett_1t5_df <- as.data.frame(google_fett_1t5)
+google_fett_1t5_df
+
+google_fett_1t5_df$interest_over_time.hits <- as.numeric(google_fett_1t5_df$interest_over_time.hits)
+
+google_fett_1t5_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+```
+# plots of google searches for fetterman's twitter's favorite words 6-10
+```{r}
+google_fett_6t10_df <- as.data.frame(google_fett_6t10)
+google_fett_6t10_df
+
+google_fett_6t10_df$interest_over_time.hits <- as.numeric(google_fett_6t10_df$interest_over_time.hits)
+
+google_fett_6t10_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+```
+
+
+
+
 
 
 
