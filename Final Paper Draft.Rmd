@@ -1,0 +1,237 @@
+---
+title: "Final Paper Work"
+output: pdf_document
+date: "2022-12-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(rtweet)
+library(twitteR)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(tidytext)
+library(gridExtra)
+```
+
+```{r}
+#web scraped using selector gadget
+src <- read_html("https://www.lesswrong.com/posts/wPYFuRq4WnTqiEyJs/carefully-edited-transcript-of-trump-s-nov-15th-campaign")
+
+trump_script <- html_nodes( src, xpath = "//p")
+trump_script
+
+tester <- trump_script
+```
+
+### OZ
+```{r}
+oz_tweets <- get_timeline(user = "DrOz", n=1000)
+
+oz_tweets_df <- tbl_df(as.data.frame(oz_tweets))
+oz_tweets_df
+```
+
+```{r}
+mean(oz_tweets_df$display_text_range)
+```
+
+```{r}
+ oz_tweets_df_timed <- oz_tweets_df %>%
+  separate(created_at, c("year", "month", "day"), sep = "-") %>%
+  separate(day, c("day", "time"), sep = " ") %>%
+  separate(time, c("hour", "minute", "second"), sep = ":") %>%
+  mutate(display_text_range_h = display_text_range > 147) %>%
+  mutate(display_text_range_l = display_text_range < 147) %>%
+  select(favorite_count, retweet_count, year, month, day, hour, display_text_range, display_text_range_h, display_text_range_l) 
+```
+```{r}
+oz_tweets_df_timed
+```
+
+
+```{r}
+oz_tweets_df_timed %>%
+  select(hour, favorite_count, display_text_range_h) %>%
+  ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
+  geom_point()+
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+```
+
+
+
+
+### OZ END
+
+
+
+
+
+
+### FETTERMAN
+```{r}
+fett_tweets <- get_timeline(user = "JohnFetterman", n=1000)
+
+fett_tweets_df <- tbl_df(as.data.frame(fett_tweets))
+fett_tweets_df
+```
+```{r}
+mean(fett_tweets_df$display_text_range)
+```
+
+```{r}
+ fett_tweets_df_timed <- fett_tweets_df %>%
+  separate(created_at, c("year", "month", "day"), sep = "-") %>%
+  separate(day, c("day", "time"), sep = " ") %>%
+  separate(time, c("hour", "minute", "second"), sep = ":") %>%
+  mutate(display_text_range_h = display_text_range > 137) %>%
+  mutate(display_text_range_l = display_text_range < 137) %>%
+  select(favorite_count, retweet_count, year, month, day, hour, display_text_range, display_text_range_h, display_text_range_l) 
+```
+```{r}
+fett_tweets_df_timed
+```
+
+```{r}
+fett_tweets_df_timed %>%
+  select(hour, favorite_count, display_text_range_h) %>%
+  ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
+  geom_point()+
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+```
+# this has a crazy outlier here of more than 600,000 favorites, so I will remove it to make the rest of the data easier to view. I will still consider the data point in my analysis
+
+```{r}
+fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed %>%
+  arrange(desc(favorite_count)) 
+  
+fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed_outlierfix [-1,] 
+fett_tweets_df_timed_outlierfix
+  
+```
+```{r}
+fett_tweets_df_timed_outlierfix %>%
+  select(hour, favorite_count, display_text_range_h) %>%
+  ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
+  geom_point()+
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+```
+
+
+### FETTERMAN END
+
+### Both
+```{r}
+oz_tweets_picture <- oz_tweets_df %>% 
+  filter(!str_detect(text, '^"')) %>%
+  count(picture = ifelse(str_detect(text, "t.co"),
+                         "Oz Picture/link", "Oz No picture/link"))%>%
+  mutate(pictureOz = picture) %>%
+  mutate(pictureFett = picture)
+oz_tweets_picture
+```
+```{r}
+fett_tweets_picture <- fett_tweets_df %>% 
+  filter(!str_detect(text, '^"')) %>%
+  count(picture = ifelse(str_detect(text, "t.co"),
+                         "Fetterman Picture/link", "Fetterman No picture/link")) %>%
+  mutate(pictureFett = picture) %>%
+  mutate(pictureOz = picture)
+fett_tweets_picture
+```
+```{r}
+oz_fett_tweets_picture <- full_join(oz_tweets_picture, fett_tweets_picture) 
+oz_fett_tweets_picture
+```
+```{r}
+ggplot(oz_fett_tweets_picture, aes(picture, n, fill = picture)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "", y = "Number of tweets", fill = "")+
+  theme(axis.text.x = element_blank())
+```
+
+### Sentiment analysis
+# Oz
+```{r}
+oz_tweet_text <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+oz_tweet_words <- oz_tweets_df %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = oz_tweet_text) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+oz_tweet_words_r <-oz_tweet_words %>%
+  count(word) %>%
+  arrange(desc(n))
+oz_tweet_words_r 
+```
+```{r}
+oz_tweet_words_top15 <- oz_tweet_words_r %>%
+  top_n(20) %>%
+  arrange(desc(n))
+
+ggplot(oz_tweet_words_top15, aes(x=n, y=word))+
+  geom_bar(stat = "identity")
+```
+
+# Fetterman
+```{r}
+fett_tweet_text <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+fett_tweet_words <- fett_tweets_df %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = fett_tweet_text) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+fett_tweet_words_r <-fett_tweet_words %>%
+  count(word) %>%
+  arrange(desc(n))
+fett_tweet_words_r 
+```
+```{r}
+fett_tweet_words_top15 <- fett_tweet_words_r %>%
+  top_n(20) %>%
+  arrange(desc(n))
+
+ggplot(fett_tweet_words_top15, aes(x=n, y=word))+
+  geom_bar(stat = "identity")
+```
+
+# both
+```{r}
+sentiments
+
+oz_tweet_words_sentiment <- oz_tweet_words_r %>%
+  inner_join(sentiments, by = "word") %>%
+  select(sentiment, word) %>%
+  count(sentiment) 
+oz_tweet_words_sentiment
+```
+
+```{r}
+fett_tweet_words_sentiment <- fett_tweet_words_r %>%
+  inner_join(sentiments, by = "word") %>%
+  select(sentiment, word) %>%
+  count(sentiment) 
+fett_tweet_words_sentiment
+```
+
+```{r}
+oz_sentiment_plot <- ggplot(oz_tweet_words_sentiment, aes(sentiment, n))+
+  geom_bar(stat = "identity", position = "dodge")
+
+fett_sentiment_plot <- ggplot(fett_tweet_words_sentiment, aes(sentiment, n))+
+  geom_bar(stat = "identity", position = "dodge")
+
+grid.arrange(oz_sentiment_plot, fett_sentiment_plot, ncol=2)
+```
+
+
+
