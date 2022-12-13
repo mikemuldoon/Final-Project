@@ -111,52 +111,263 @@ mean(fett_tweets_df$display_text_range) # mean is 137, so that will be the cutto
 fett_tweets_df_timed
 ```
 
-
+# In order to see just how much these Twitter accounts are impacting voters, I accessed google search history by way of the gtrendsR package over the period of time that my tweet data is over. I have not included the code for this part here because it is included later on in analysis.
 
 
 ## Results
+# Tweet Data Over a 24 Hour Clock
+
 # The first visualization to take note of are point plots for each candidate's Twitter account data over the last several months. Each plot shows the number of favorites received by each tweet by hour of the day, controlled for the number of characters being above or below its mean. 
 ```{r}
+# This shows Mehmet Oz's twitter account data. We can see clearly that his account generally tweets at all hours of the day, with highest volume of tweets coming between 9am and 6pm. There appears to be no difference in the amount of favorites for longer and shorter tweets, but we can see that the account tends to post longer tweets in the afternoon, particularly from 2pm to 5pm. Tweets posted during sunlight hours tend to do better than those posted during dark, but the spread of favorites is consistent across most hours of the day, with most posts garnering less than 5,000 favorites no matter the time. 
+
 oz_tweets_df_timed %>%
   select(hour, favorite_count, display_text_range_h) %>%
   ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
   geom_point()+
   labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
 ```
+```{r}
+# When creating this plot, this visualization was thrown off by a an outlier of more than 600,000 favorites. In order to make the plot more visible, I removed the outlier by moving it to the top of my frame and deleting the row from that specific dataset.
+fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed %>%
+  arrange(desc(favorite_count)) 
+  
+fett_tweets_df_timed_outlierfix <- fett_tweets_df_timed_outlierfix [-1,] 
+fett_tweets_df_timed_outlierfix
+```
+```{r}
+# *Note that an outlier with over 600,000 likes has been removed from this specific plot. The outlier was a tweet confirming Fetterman's victory on November 9th at about 12am. Because it is not relevant to campaign analysis (it essentially announces the campaign is over) and presents such a visual issue I have removed it, making this plot have n=999.*
+# This shows the account data for John Fetterman's Twitter, with the outlier removed. Fetterman's account has a tendency to start and end posting about 1 to 2 hours later than Oz's. Unlike Oz, there seems to be no pattern to whether or not a Fetterman tweet will be above or below the mean character number, with character number seeming to have no impact on amount of favorites either. Fetterman's account posts a consistently high volume of tweets between 9am and 8pm. Fetterman's tweets tend to receive less overall favorites than Oz's but both appear to have adopted the strategy of sending a high volume of posts throughout all waking hours of the day in order to reach potential voters. 
 
+fett_tweets_df_timed_outlierfix %>%
+  select(hour, favorite_count, display_text_range_h) %>%
+  ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
+  geom_point()+
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 137 Characters")
+```
 
 
 
 ### Data exploration
+# Tweets With Pictueres and/or Links
 
-The results section may have a data exploration part, but in general the structure here depends on the specific project.
-
+# In order to gain a better understanding of the strategies behind certain posts on each Twitter account, I want to find out if either candidate posts pictures or links considerably more than the other. To do this, I filtered the text variable to separate tweets with pictures/links from those without, and counted the total number of each. I then created a new variable for each candidates numbers of tweets with picture/link, and joined the 2 separate datasets into 1.
 ```{r}
-# What happens here depends on the specific project
+# filtering by picture/link or not
+# counting the total number of picture/link tweets and non picture/link tweets
+# mutating to create variables for both accounts
+oz_tweets_picture <- oz_tweets_df %>% 
+  filter(!str_detect(text, '^"')) %>%
+  count(picture = ifelse(str_detect(text, "t.co"),
+                         "Oz Picture/link", "Oz No picture/link"))%>%
+  mutate(pictureOz = picture) %>%
+  mutate(pictureFett = picture)
+oz_tweets_picture
+```
+```{r include=FALSE}
+# this is the same exact code as above, just Fetterman substituted for Oz. Because it is repetitive I have hidden it in my final output.
+fett_tweets_picture <- fett_tweets_df %>% 
+  filter(!str_detect(text, '^"')) %>%
+  count(picture = ifelse(str_detect(text, "t.co"),
+                         "Fetterman Picture/link", "Fetterman No picture/link")) %>%
+  mutate(pictureFett = picture) %>%
+  mutate(pictureOz = picture)
+fett_tweets_picture
+```
+```{r}
+# joining individual data into 1 tibble
+oz_fett_tweets_picture <- full_join(oz_tweets_picture, fett_tweets_picture) 
+oz_fett_tweets_picture
+```
+```{r}
+# This shows no considerable or significant difference in posting pictures or links between each account, but the findings did surprise me. Both twitter account actually favor posting a picture or link in tweets more than they do without them. In today's world where news is as fast as it comes, it could provide an advantage to include a link or picture in a tweet in order to grab the attention of a would be reader, rather than simple text. This idea is only bolstered by the fact that Fetterman, who's account opts to provide pictures/links a bit more than Oz's does, actually won the election with a considerable amount of votes from populations that are active on Twitter, like young people.
+
+ggplot(oz_fett_tweets_picture, aes(picture, n, fill = picture)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "", y = "Number of tweets", fill = "")+
+  theme(axis.text.x = element_blank())
+```
+
+# Sentiment Analysis
+# In order to understand what is being said by each account, I conducted sentiment anlysis on the top used words from both accounts. I used tokenization and stopwords to divide every single tweet into individual words, then pulled the top 20 most used words over 1,000 tweets and plotted them.
+```{r}
+# created a token
+# implemented token and stopwords
+# created a corpus of individual words
+oz_tweet_text <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+oz_tweet_words <- oz_tweets_df %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = oz_tweet_text) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+# counting the total number of uses of each word and sorting from the top
+oz_tweet_words_r <-oz_tweet_words %>%
+  count(word) %>%
+  arrange(desc(n))
+oz_tweet_words_r 
+```
+```{r}
+# plotting the top 20 most used words on Oz's Twitter account
+# Unsuprisingly Oz's top words are by far the first and last name of his opponent. He uses a number of 'buzz' words expected to trigger a certain reaction in voters who read them such "washington", "crime", and "biden", all words he knows will anger a Republican voter base and influence them to throw him more support.
+
+oz_tweet_words_top20 <- oz_tweet_words_r %>%
+  top_n(20) %>%
+  arrange(desc(n))
+oz_tweet_words_top20
+
+ggplot(oz_tweet_words_top20, aes(x=n, y=word))+
+  geom_bar(stat = "identity")
+```
+
+```{r, include=FALSE}
+# this is the same process as above and is repetitive, so I have hidden it in final output
+
+fett_tweet_text <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+fett_tweet_words <- fett_tweets_df %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = fett_tweet_text) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+fett_tweet_words_r <-fett_tweet_words %>%
+  count(word) %>%
+  arrange(desc(n))
+fett_tweet_words_r 
+
+fett_tweet_words_top20 <- fett_tweet_words_r %>%
+  top_n(20) %>%
+  arrange(desc(n))
+
+ggplot(fett_tweet_words_top20, aes(x=n, y=word))+
+  geom_bar(stat = "identity")
+```
+
+# The last step here is to garner some level of sentiment for each of these words. I have used the NRC Word-Emotion Association lexicon from the tidytext package, which classifies almost all english words into either a positive or negative sentiment. I join the sentiments dataset with each dataset of common words. Lastly I count the total number of positve/negative sentiments and eventually plot them side by side to compare.
+```{r}
+# combining sentiments dataset with common words for each candidate's Twitter account
+oz_tweet_words_sentiment <- oz_tweet_words_r %>%
+  inner_join(sentiments, by = "word") %>%
+  select(sentiment, word) %>%
+  count(sentiment) 
+oz_tweet_words_sentiment
+```
+```{r}
+fett_tweet_words_sentiment <- fett_tweet_words_r %>%
+  inner_join(sentiments, by = "word") %>%
+  select(sentiment, word) %>%
+  count(sentiment) 
+fett_tweet_words_sentiment
 ```
 
 ```{r}
-# What happens here depends on the specific project
+# creating plots for the total number of positive/negative words for each account
+oz_sentiment_plot <- ggplot(oz_tweet_words_sentiment, aes(sentiment, n))+
+  geom_bar(stat = "identity", position = "dodge")
+
+fett_sentiment_plot <- ggplot(fett_tweet_words_sentiment, aes(sentiment, n, ylim=c(0,250)))+
+  geom_bar(stat = "identity", position = "dodge")
+
+grid.arrange(oz_sentiment_plot, fett_sentiment_plot, ncol=2)
 ```
+# Mehmet Oz's account on left, John Fetterman's account on right. We can see here that both candidates' accounts use a similar amount of negative and positive words overall. Both are nearly exactly the same in terms of negative words, while Oz actually uses about 30 to 40 more positive words per every 1000 tweets.
+
+
 
 ### Analysis
+# In order to understand how much these Twitter accounts are impacting people within the places they are running in, I have pulled google search data usign gtrendsR from the period of time since my tweets starting being collected until the day after the election, which results in a time period from 06/20/22 to 11/09/22. 
+```{r}
+# Since each candidate uses their opponents names more often than any other words, I have first analyzed the searches of these
 
-This section presents the main results, such as (for example) stats and graphs that show relationships, model results and/or clustering, PCA, etc.
+names <- gtrends(c("dr", "oz", "john", "fetterman"), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+plot(names)
+```
+# Unsuprisingly, the last names of both candidates spike in searches around the time of their October 25th debate, as well as leading up to the November 8th election.
 
 ```{r}
-# What happens here depends on the specific project
+# Out of the 20 most commonly used words by Oz's account, the 10 selected here were the top ones that weren't the opponent's name, the name of the state, or having to do with Twitter itself (ei: "rt"). The plots show google search hits over time.
+
+google_oz_1t5 <- gtrends(c("crime", "biden", "policy", 'radical', 'washington'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+
+google_oz_6t10 <- gtrends(c("debate", 'senate', 'change', 'inflation', 'energy'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+```
+
+```{r, include=FALSE}
+# this is essentially the same code, but with the top common words for Fetterman. Since it is repetitive I have hidden the final output.
+
+google_fett_1t5 <- gtrends(c("vote", "people", "senate", 'campaign', 'abortion'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+
+google_fett_6t10 <- gtrends(c("fight", 'election', 'union', 'life', 'philly'), 
+               geo = "US-PA", time= "2022-06-20 2022-11-9", onlyInterest = TRUE)
+```
+
+# We can see here that buzz words used by Oz in his tweets have spiked in popularity on google in Pennsylvania several times, possibly due to his repetitive use of them in his tweets. This is less so seen in searches for Fetterman's common words, which may mean the specific words he uses have less of an impact on his voter base than his overall message, as opposed to Oz.
+```{r}
+grid.arrange(google_oz_1t5_plot, google_oz_6t10_plot, ncol=1) 
+grid.arrange(google_fett_1t5_plot, google_fett_6t10_plot, ncol=1)
+```
+
+# Included below is in depth plots for each individual word's google search hits over the same time period. 
+```{r}
+google_oz_1t5_df <- as.data.frame(google_oz_1t5)
+google_oz_1t5_df
+
+google_oz_1t5_df$interest_over_time.hits <- as.numeric(google_oz_1t5_df$interest_over_time.hits)
+
+google_oz_1t5_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+
+# We can see that as Oz tweets more about crime over time, total searches for crime on google increase slightly as well. In the months leading up to the election, we can also see searches for washington icnrease, just as Oz's account continues to tweet about it ffrequently.
 ```
 
 ```{r}
-# What happens here depends on the specific project
+google_oz_6t10_df <- as.data.frame(google_oz_6t10)
+google_oz_6t10_df
+
+google_oz_6t10_df$interest_over_time.hits <- as.numeric(google_oz_6t10_df$interest_over_time.hits)
+
+google_oz_6t10_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+# For every word below besides inflation, we can see increases in searches for the words Oz's Twitter account likes the most, possibly due to him driving home these issues countless times.
 ```
 
 ```{r}
-# What happens here depends on the specific project
+google_fett_1t5_df <- as.data.frame(google_fett_1t5)
+google_fett_1t5_df
+
+google_fett_1t5_df$interest_over_time.hits <- as.numeric(google_fett_1t5_df$interest_over_time.hits)
+
+google_fett_1t5_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+# Like before, we can see that searches for all 5 words increase leading up to the election, as Fetterman continues to tweet about them often. 
 ```
+
+```{r}
+google_fett_6t10_df <- as.data.frame(google_fett_6t10)
+google_fett_6t10_df
+
+google_fett_6t10_df$interest_over_time.hits <- as.numeric(google_fett_6t10_df$interest_over_time.hits)
+
+google_fett_6t10_df %>%
+  qplot(x = interest_over_time.date, y = interest_over_time.hits, data = ., 
+        geom = "point", facets = . ~ interest_over_time.keyword)
+# Here we can see an increase along the same lines as before for election and union, but not necessarily for the other 3. This is likely because the other 3 words are used in many contexts outside of politics, and have relatively high search rates at all times.
+```
+
+
 
 ## Discussion
+  The Twitter accounts of both of these candidates can provide us with several meaningful assumptions about the importance of Twitter to modern day campaigns and how these accounts may impact people in Pennsylvania. These findings have been expanded on throughout this report and have varying degrees of certainty and value. We can say for sure that as these Senate candidates utilized similar methods as each other - by using commonly known political words early and often, and relying on the use of pictures and links in tweets to drive up engagement. We can also say for certain that when these 2 candidates tweet certain words often, those words are generally receive a spike in their use on google searches, perhaps outlining that these candidates are influencing constituents to research or learn things related to these words. 
+  What we cannot say with as much certainty is whether or not these words are being searched more as a direct result of the Twitter accounts, or because of a variety of other factors and influences at work during election season. Further research in this area should expand upon the degree to which Twitter accounts are influencing the thoughts of voters leading up to elections through survey data and opinion polls taken during the time of the tweets.
 
-This section summarizes the results and may briefly outline advantages and limitations of the work presented.
 
 ## References

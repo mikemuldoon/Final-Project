@@ -119,7 +119,7 @@ fett_tweets_df_timed_outlierfix %>%
   select(hour, favorite_count, display_text_range_h) %>%
   ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
   geom_point()+
-  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 137 Characters")
 ```
 
 
