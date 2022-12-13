@@ -28,7 +28,8 @@ oz_tweets <- get_timeline(user = "DrOz", n=1000)
 oz_tweets_df <- tbl_df(as.data.frame(oz_tweets))
 oz_tweets_df
 ```
-# getting mean of fetterman tweets for cuttoff point
+
+# getting mean of oz tweets for cuttoff point
 ```{r}
 mean(oz_tweets_df$display_text_range)
 ```

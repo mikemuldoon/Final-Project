@@ -1,0 +1,162 @@
+---
+title: "Fundamentals of Computing and Data Display"
+subtitle: "Term paper template"
+author: "Michael Muldoon"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+    df_print: kable
+references:
+- id: Wickham2014
+  title: Tidy Data
+  author:
+  - family: Wickham
+    given: Hadley
+  container-title: Journal of Statistical Software
+  volume: 59
+  issue: 10
+  page: 1-23
+  type: article-journal
+  issued:
+    year: 2014
+- id: Baumer2017
+  title: Modern Data Science with R
+  author:
+  - family: Baumer
+    given: Benjamin S.
+  - family: Kaplan
+    given: Daniel T.
+  - family: Horton
+    given: Nicholas J.
+  type: book
+  publisher: Chapman \& Hall/CRC Press.
+  issued:
+    year: 2017
+---
+
+```{r, include = FALSE}
+library(knitr)
+library(tidyverse)
+library(rtweet)
+library(twitteR)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(tidytext)
+library(gridExtra)
+library(gtrendsR)
+```
+
+## Introduction
+Throughout history, new waves of media have heavily influenced politics and the way we as voters look at politicians. The advent of radio, television, and now social media have all drastically impacted the way things are perceived. Politicians have had to adapt to this new form of communication by adopting it to their campaigns. Donald Trump successfully wielded Twitter as a way to speak to his populous directly on a daily basis, while Joe Biden uses it as a method of delivering information on important topics and events. Twitter's dynamic is perhaps perfect for politics, by allowing anyone to send a message consisting of up to 280 characters and any links or videos to go along with it. In order to understand how Twitter accounts of candidates may be influencing important elections, I have analyzed the accounts of both 2022 Senate candidates for Penssylvania, Mehmet Oz and John Fetterman. This race was perhaps the most important in the country in terms of the balance of political power, so it is of particular interest to me to understand all of the aspects of each campaign, especially one as new and under-researched as social media accounts. I have analyzed tweets over the last several months from each account to see what kinds of tweets were being sent by each side, and how much those tweets may have impacted the Pennsylvania populous. Findings from this report may provide
+
+
+This section outlines the research idea. We can also cite related work here [@Wickham2014; @Baumer2017].
+
+Note that compiled term paper (the PDF) is supposed to be more text-centered than the RMarkdown documents we used in class, i.e. the text sections are more detailed and big or redundant code chunks can be hidden.
+
+# 
+
+## Data
+
+This section describes the data sources and the data gathering process.
+
+# I used the get_timeline() command from the rtweet package to gather the last 1000 tweets from Mehmet Oz's Twitter account. I then converted the data into a data fram with tbl_df() and as.data.frame().
+```{r}
+oz_tweets <- get_timeline(user = "DrOz", n=1000)
+
+oz_tweets_df <- tbl_df(as.data.frame(oz_tweets))
+oz_tweets_df
+```
+
+# I then used mean() to find the mean of characters used per tweet. I will use this to create a cuttof point at the mean to see if there are any significant differences between shorter and longer tweets and their receptions by the audience.
+```{r}
+mean(oz_tweets_df$display_text_range)
+```
+# Mean is 147.314, so I will use 147 characters as the cuttoff point.
+
+# Here I cleaned the data for Oz's twitter account. I used dplyr to make a number of changes such as separating the created_at variable, which includes year, month, day, hour, minute, and second in one variable, into 6 different variables, allowing me to look at tweet data over time. After this, I created a binary variable for character numbers by introducing cuttoff point at the mean of that variable. I then selected all of the variables I found relevant to my analysis and produced a tibble that is ready to be analyzed.
+```{r}
+ oz_tweets_df_timed <- oz_tweets_df %>%
+  separate(created_at, c("year", "month", "day"), sep = "-") %>%
+  separate(day, c("day", "time"), sep = " ") %>%
+  separate(time, c("hour", "minute", "second"), sep = ":") %>%
+  mutate(display_text_range_h = display_text_range > 147) %>%
+  mutate(display_text_range_l = display_text_range < 147) %>%
+  select(favorite_count, retweet_count, year, month, day, hour, display_text_range, display_text_range_h, display_text_range_l) 
+
+oz_tweets_df_timed
+```
+# I repeated a very similar process for John Fetterman's Twitter account. Since the code is almost the same, I have imbedded it's chunks with include=FALSE. 
+```{r, include = FALSE}
+fett_tweets <- get_timeline(user = "JohnFetterman", n=1000)
+
+fett_tweets_df <- tbl_df(as.data.frame(fett_tweets))
+fett_tweets_df
+```
+```{r, include = FALSE}
+mean(fett_tweets_df$display_text_range) # mean is 137, so that will be the cuttof point
+```
+```{r, include = FALSE}
+ fett_tweets_df_timed <- fett_tweets_df %>%
+  separate(created_at, c("year", "month", "day"), sep = "-") %>%
+  separate(day, c("day", "time"), sep = " ") %>%
+  separate(time, c("hour", "minute", "second"), sep = ":") %>%
+  mutate(display_text_range_h = display_text_range > 137) %>%
+  mutate(display_text_range_l = display_text_range < 137) %>%
+  select(favorite_count, retweet_count, year, month, day, hour, display_text_range, display_text_range_h, display_text_range_l) 
+
+fett_tweets_df_timed
+```
+
+
+
+
+## Results
+# The first visualization to take note of are point plots for each candidate's Twitter account data over the last several months. Each plot shows the number of favorites received by each tweet by hour of the day, controlled for the number of characters being above or below its mean. 
+```{r}
+oz_tweets_df_timed %>%
+  select(hour, favorite_count, display_text_range_h) %>%
+  ggplot(aes(hour, favorite_count, color = display_text_range_h)) +
+  geom_point()+
+  labs(x = "Hour of the Day (EST)", y = "Number of Favorites", color = "Above 147 Characters")
+```
+
+
+
+
+### Data exploration
+
+The results section may have a data exploration part, but in general the structure here depends on the specific project.
+
+```{r}
+# What happens here depends on the specific project
+```
+
+```{r}
+# What happens here depends on the specific project
+```
+
+### Analysis
+
+This section presents the main results, such as (for example) stats and graphs that show relationships, model results and/or clustering, PCA, etc.
+
+```{r}
+# What happens here depends on the specific project
+```
+
+```{r}
+# What happens here depends on the specific project
+```
+
+```{r}
+# What happens here depends on the specific project
+```
+
+## Discussion
+
+This section summarizes the results and may briefly outline advantages and limitations of the work presented.
+
+## References
